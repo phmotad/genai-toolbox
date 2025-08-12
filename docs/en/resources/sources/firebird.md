@@ -1,7 +1,7 @@
 ---
 title: "Firebird"
 type: docs
-weight: 8
+weight: 1
 description: >
   Firebird is a powerful, cross-platform, and open-source relational database.
 

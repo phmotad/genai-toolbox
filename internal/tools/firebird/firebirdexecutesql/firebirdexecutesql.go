@@ -99,9 +99,11 @@ func (cfg Config) Initialize(srcs map[string]sources.Source) (tools.Tool, error)
 var _ tools.Tool = &Tool{}
 
 type Tool struct {
-	Name         string
-	Parameters   tools.Parameters
-	AuthRequired []string
+	Name         string           `yaml:"name"`
+	Kind         string           `yaml:"kind"`
+	AuthRequired []string         `yaml:"authRequired"`
+	Parameters   tools.Parameters `yaml:"parameters"`
+
 	Db           *sql.DB
 	manifest     tools.Manifest
 	mcpManifest  tools.McpManifest
@@ -109,14 +111,18 @@ type Tool struct {
 
 func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error) {
 	mapParams := params.AsMap()
-	sqlParam, exists := mapParams["sql"]
-	if !exists {
-		return nil, fmt.Errorf("missing required 'sql' parameter")
-	}
-	sql, ok := sqlParam.(string)
+	sql, ok := paramsMap["sql"].(string)
 	if !ok {
-		return nil, fmt.Errorf("parameter 'sql' is not a valid string, got %T", sqlParam)
+		return nil, fmt.Errorf("unable to get cast %s", paramsMap["sql"])
 	}
+	}
+
+	// Log the query executed for debugging.
+	logger, err := util.LoggerFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting logger: %s", err)
+	}
+	logger.DebugContext(ctx, "executing `%s` tool query: %s", kind, sql)
 
 	rows, err := t.Db.QueryContext(ctx, sql)
 	if err != nil {
