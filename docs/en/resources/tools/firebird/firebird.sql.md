@@ -21,7 +21,7 @@ and specified parameters will be inserted into the anonymous `?` placeholders
 according to their position. If template parameters are included, they will be
 resolved before the execution of the prepared statement.
 
-[fb-prepare]: https://firebirdsql.org/refdocs/langrefupd25-psql-execstmt.html
+[fb-prepare]: https://firebirdsql.org/refdocs/langrefupd25-psql-execstat.html
 
 ## Example
 
