@@ -99,9 +99,11 @@ func (cfg Config) Initialize(srcs map[string]sources.Source) (tools.Tool, error)
 var _ tools.Tool = &Tool{}
 
 type Tool struct {
-	Name         string
-	Parameters   tools.Parameters
-	AuthRequired []string
+	Name         string           `yaml:"name"`
+	Kind         string           `yaml:"kind"`
+	AuthRequired []string         `yaml:"authRequired"`
+	Parameters   tools.Parameters `yaml:"parameters"`
+
 	Db           *sql.DB
 	manifest     tools.Manifest
 	mcpManifest  tools.McpManifest
