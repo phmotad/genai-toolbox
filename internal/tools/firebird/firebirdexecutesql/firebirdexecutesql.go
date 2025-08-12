@@ -117,6 +117,13 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 	}
 	}
 
+	// Log the query executed for debugging.
+	logger, err := util.LoggerFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting logger: %s", err)
+	}
+	logger.DebugContext(ctx, "executing `%s` tool query: %s", kind, sql)
+
 	rows, err := t.Db.QueryContext(ctx, sql)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute query: %w", err)
