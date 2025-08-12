@@ -88,9 +88,9 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	defer db.Close()
 
 	shortUUID := strings.ReplaceAll(uuid.New().String(), "-", "")[:8]
-	tableNameParam := fmt.Sprintf("PARAM_TABLE_%s", shortUUID)
-	tableNameAuth := fmt.Sprintf("AUTH_TABLE_%s", shortUUID)
-	tableNameTemplateParam := fmt.Sprintf("TPARAM_TABLE_%s", shortUUID)
+	tableNameParam := fmt.Sprintf("param_table_%s", shortUUID)
+	tableNameAuth := fmt.Sprintf("auth_table_%s", shortUUID)
+	tableNameTemplateParam := fmt.Sprintf("template_param_table_%s", shortUUID)
 
 	createParamTableStmts, insertParamTableStmt, paramToolStmt, idParamToolStmt, nameParamToolStmt, arrayToolStmt, paramTestParams := getFirebirdParamToolInfo(tableNameParam)
 	teardownTable1 := setupFirebirdTable(t, ctx, db, createParamTableStmts, insertParamTableStmt, tableNameParam, paramTestParams)
