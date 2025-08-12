@@ -76,7 +76,7 @@ func initFirebirdConnection(host, port, user, pass, dbname string) (*sql.DB, err
 
 func TestFirebirdToolEndpoints(t *testing.T) {
 	sourceConfig := getFirebirdVars(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
 	var args []string
