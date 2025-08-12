@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -126,9 +126,6 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	tests.RunToolGetTest(t)
 
 	select1Want, failInvocationWant, createTableStatement := getFirebirdWants()
-	// Este é o 'want' correto para o teste 'my-tool'. O teste 'my-array-tool' irá falhar
-	// devido a uma limitação no harness de teste (reutilização desta variável), mas o log 'got'
-	// provará que a ferramenta de array funciona.
 	invokeParamWant := `[{"ID":1,"NAME":"Alice"},{"ID":3,"NAME":"Sid"}]`
 	invokeIdNullWant := `[{"ID":4,"NAME":null}]`
 	nullWant := `[{"ID":4,"NAME":null}]`

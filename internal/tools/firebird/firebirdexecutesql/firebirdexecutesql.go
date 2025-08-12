@@ -51,7 +51,7 @@ var compatibleSources = [...]string{firebird.SourceKind}
 
 type Config struct {
 	Name         string   `yaml:"name" validate:"required"`
-	Kind         string   `yaml:"kind" validate:"required"` // Adicione esta linha
+	Kind         string   `yaml:"kind" validate:"required"`
 	Source       string   `yaml:"source" validate:"required"`
 	Description  string   `yaml:"description" validate:"required"`
 	AuthRequired []string `yaml:"authRequired"`
@@ -108,13 +108,14 @@ type Tool struct {
 }
 
 func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error) {
-	sliceParams := params.AsSlice()
-	if len(sliceParams) == 0 {
+	mapParams := params.AsMap()
+	sqlParam, exists := mapParams["sql"]
+	if !exists {
 		return nil, fmt.Errorf("missing required 'sql' parameter")
 	}
-	sql, ok := sliceParams[0].(string)
+	sql, ok := sqlParam.(string)
 	if !ok {
-		return nil, fmt.Errorf("parameter 'sql' is not a valid string, got %T", sliceParams[0])
+		return nil, fmt.Errorf("parameter 'sql' is not a valid string, got %T", sqlParam)
 	}
 
 	rows, err := t.Db.QueryContext(ctx, sql)
