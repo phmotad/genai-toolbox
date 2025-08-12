@@ -133,17 +133,10 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 	finalSQL := statement
 	var finalParams []any
 
-	if len(t.Parameters) > 0 {
-		// Filtra para obter apenas os valores dos parâmetros regulares, na ordem correta.
-		var regularParamValues tools.ParamValues
-		for _, pDef := range t.Parameters {
-			for _, pVal := range params {
-				if pDef.GetName() == pVal.Name {
-					regularParamValues = append(regularParamValues, pVal)
-					break
-				}
-			}
-		}
+	finalParams, err := tools.GetParams(t.Parameters, paramsMap)
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract standard params %w", err)
+	}
 
 		var errPrep error
 		finalSQL, finalParams, errPrep = prepareQueryForArrays(statement, t.Parameters, regularParamValues)
