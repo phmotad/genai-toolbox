@@ -111,13 +111,10 @@ type Tool struct {
 
 func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error) {
 	mapParams := params.AsMap()
-	sqlParam, exists := mapParams["sql"]
-	if !exists {
-		return nil, fmt.Errorf("missing required 'sql' parameter")
-	}
-	sql, ok := sqlParam.(string)
+	sql, ok := paramsMap["sql"].(string)
 	if !ok {
-		return nil, fmt.Errorf("parameter 'sql' is not a valid string, got %T", sqlParam)
+		return nil, fmt.Errorf("unable to get cast %s", paramsMap["sql"])
+	}
 	}
 
 	rows, err := t.Db.QueryContext(ctx, sql)
