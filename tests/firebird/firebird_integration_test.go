@@ -225,11 +225,11 @@ func getFirebirdParamToolInfo(tableName string) ([]string, string, string, strin
 		`, tableName, tableName, tableName),
 	}
 
-	insertStatement := fmt.Sprintf("INSERT INTO %s (NAME) VALUES (?);", tableName)
-	toolStatement := fmt.Sprintf("SELECT ID, NAME FROM %s WHERE ID = ? OR NAME = ?;", tableName)
-	idParamStatement := fmt.Sprintf("SELECT ID, NAME FROM %s WHERE ID = ?;", tableName)
-	nameParamStatement := fmt.Sprintf("SELECT ID, NAME FROM %s WHERE NAME IS NOT DISTINCT FROM ?;", tableName)
-	arrayToolStatement := fmt.Sprintf("SELECT ID, NAME FROM %s WHERE ID IN (?) ORDER BY ID;", tableName)
+	insertStatement := fmt.Sprintf("INSERT INTO %s (name) VALUES (?);", tableName)
+	toolStatement := fmt.Sprintf("SELECT id, name FROM %s WHERE id = ? OR name = ?;", tableName)
+	idParamStatement := fmt.Sprintf("SELECT id, name FROM %s WHERE id = ?;", tableName)
+	nameParamStatement := fmt.Sprintf("SELECT id, name FROM %s WHERE name IS NOT DISTINCT FROM ?;", tableName)
+	arrayToolStatement := fmt.Sprintf("SELECT id, name FROM %s WHERE id IN (?) ORDER BY id;", tableName)
 
 	params := []any{"Alice", "Jane", "Sid", nil}
 	return createStatements, insertStatement, toolStatement, idParamStatement, nameParamStatement, arrayToolStatement, params
