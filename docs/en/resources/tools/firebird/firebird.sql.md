@@ -17,9 +17,10 @@ database. It's compatible with the following source:
 - [firebird](../sources/firebird.md)
 
 The specified SQL statement is executed as a [prepared statement][fb-prepare],
-and specified parameters will be inserted into the anonymous `?` placeholders
-according to their position. If template parameters are included, they will be
-resolved before the execution of the prepared statement.
+and supports both positional parameters (`?`) and named parameters (`:param_name`).
+Parameters will be inserted according to their position or name. If template 
+parameters are included, they will be resolved before the execution of the 
+prepared statement.
 
 [fb-prepare]: https://firebirdsql.org/refdocs/langrefupd25-psql-execstat.html
 
@@ -66,6 +67,33 @@ tools:
       - name: flight_number
         type: string
         description: 1 to 4 digit number
+```
+
+### Example with Named Parameters
+
+```yaml
+tools:
+  search_flights_by_airline:
+    kind: firebird-sql
+    source: my_firebird_db
+    statement: |
+      SELECT * FROM flights
+      WHERE airline = :airline
+      AND departure_date >= :start_date
+      AND departure_date <= :end_date
+      ORDER BY departure_date
+    description: |
+      Search for flights by airline within a date range using named parameters.
+    parameters:
+      - name: airline
+        type: string
+        description: Airline unique 2 letter identifier
+      - name: start_date
+        type: string
+        description: Start date in YYYY-MM-DD format
+      - name: end_date
+        type: string
+        description: End date in YYYY-MM-DD format
 ```
 
 ### Example with Template Parameters

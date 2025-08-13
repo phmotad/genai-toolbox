@@ -23,6 +23,7 @@ import (
 	"github.com/googleapis/genai-toolbox/internal/sources"
 	"github.com/googleapis/genai-toolbox/internal/sources/firebird"
 	"github.com/googleapis/genai-toolbox/internal/tools"
+	"github.com/googleapis/genai-toolbox/internal/util"
 )
 
 const kind string = "firebird-execute-sql"
@@ -104,17 +105,16 @@ type Tool struct {
 	AuthRequired []string         `yaml:"authRequired"`
 	Parameters   tools.Parameters `yaml:"parameters"`
 
-	Db           *sql.DB
-	manifest     tools.Manifest
-	mcpManifest  tools.McpManifest
+	Db          *sql.DB
+	manifest    tools.Manifest
+	mcpManifest tools.McpManifest
 }
 
 func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error) {
-	mapParams := params.AsMap()
+	paramsMap := params.AsMap()
 	sql, ok := paramsMap["sql"].(string)
 	if !ok {
 		return nil, fmt.Errorf("unable to get cast %s", paramsMap["sql"])
-	}
 	}
 
 	// Log the query executed for debugging.
@@ -142,14 +142,14 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 		return nil, nil
 	}
 
+	values := make([]any, len(cols))
+	scanArgs := make([]any, len(values))
+	for i := range values {
+		scanArgs[i] = &values[i]
+	}
+
 	var out []any
 	for rows.Next() {
-		values := make([]any, len(cols))
-		scanArgs := make([]any, len(values))
-		for i := range values {
-			scanArgs[i] = &values[i]
-		}
-
 		err = rows.Scan(scanArgs...)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse row: %w", err)
