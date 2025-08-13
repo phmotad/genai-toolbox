@@ -107,7 +107,7 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	toolsFile := tests.GetFirebirdToolsConfig(sourceConfig, FirebirdToolKind, paramToolStmt, idParamToolStmt, nameParamToolStmt, arrayToolStmt, authToolStmt)
 	toolsFile = tests.AddFirebirdExecuteSqlConfig(t, toolsFile)
 	tmplSelectCombined, tmplSelectFilterCombined := tests.GetFirebirdTmplToolStatement()
-	toolsFile = tests.AddTemplateParamConfig(t, toolsFile, FirebirdToolKind, tmplSelectCombined, tmplSelectFilterCombined, "SELECT * FROM {{.tableName}} ORDER BY ID")
+	toolsFile = tests.AddTemplateParamConfig(t, toolsFile, FirebirdToolKind, tmplSelectCombined, tmplSelectFilterCombined, "")
 
 	cmd, cleanup, err := tests.StartCmd(ctx, toolsFile, args...)
 	if err != nil {
