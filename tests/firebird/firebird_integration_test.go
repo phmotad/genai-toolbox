@@ -41,7 +41,6 @@ var (
 )
 
 func getFirebirdVars(t *testing.T) map[string]any {
-	t.Helper()
 	switch "" {
 	case FirebirdDatabase:
 		t.Fatal("'FIREBIRD_DATABASE' not set")
@@ -104,9 +103,9 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	teardownTemplateTable := setupFirebirdTable(t, ctx, db, createTemplateStmts, insertTemplateStmt, tableNameTemplateParam, templateTestParams)
 	defer teardownTemplateTable(t)
 
-	toolsFile := tests.GetFirebirdToolsConfig(sourceConfig, FirebirdToolKind, paramToolStmt, idParamToolStmt, nameParamToolStmt, arrayToolStmt, authToolStmt)
-	toolsFile = tests.AddFirebirdExecuteSqlConfig(t, toolsFile)
-	tmplSelectCombined, tmplSelectFilterCombined := tests.GetFirebirdTmplToolStatement()
+	toolsFile := getFirebirdToolsConfig(sourceConfig, FirebirdToolKind, paramToolStmt, idParamToolStmt, nameParamToolStmt, arrayToolStmt, authToolStmt)
+	toolsFile = addFirebirdExecuteSqlConfig(t, toolsFile)
+	tmplSelectCombined, tmplSelectFilterCombined := getFirebirdTmplToolStatement()
 	toolsFile = tests.AddTemplateParamConfig(t, toolsFile, FirebirdToolKind, tmplSelectCombined, tmplSelectFilterCombined, "")
 
 	cmd, cleanup, err := tests.StartCmd(ctx, toolsFile, args...)
@@ -126,10 +125,10 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	tests.RunToolGetTest(t)
 
 	select1Want, failInvocationWant, createTableStatement := getFirebirdWants()
-	invokeParamWant := `[{"ID":1,"NAME":"Alice"},{"ID":3,"NAME":"Sid"}]`
-	invokeIdNullWant := `[{"ID":4,"NAME":null}]`
-	nullWant := `[{"ID":4,"NAME":null}]`
-	mcpInvokeParamWant := `{"jsonrpc":"2.0","id":"my-tool","result":{"content":[{"type":"text","text":"{\"ID\":1,\"NAME\":\"Alice\"}"},{"type":"text","text":"{\"ID\":3,\"NAME\":\"Sid\"}"}]}}`
+	invokeParamWant := `[{"id":1,"name":"Alice"},{"id":3,"name":"Sid"}]`
+	invokeIdNullWant := `[{"id":4,"name":null}]`
+	nullWant := `[{"id":4,"name":null}]`
+	mcpInvokeParamWant := `{"jsonrpc":"2.0","id":"my-tool","result":{"content":[{"type":"text","text":"{\"id\":1,\"name\":\"Alice\"}"},{"type":"text","text":"{\"id\":3,\"name\":\"Sid\"}"}]}}`
 
 	tests.RunToolInvokeTest(t, select1Want, invokeParamWant, invokeIdNullWant, nullWant, true, true)
 	tests.RunExecuteSqlToolInvokeTest(t, createTableStatement, select1Want)
@@ -138,16 +137,15 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	templateParamTestConfig := tests.NewTemplateParameterTestConfig(
 		tests.WithIgnoreDdl(),
 		tests.WithIgnoreInsert(),
-		tests.WithSelect1Want(`[{"AGE":21,"ID":1,"NAME":"Alex"}]`),
-		tests.WithSelectAllWant(`[{"AGE":21,"ID":1,"NAME":"Alex"},{"AGE":100,"ID":2,"NAME":"Alice"}]`),
-		tests.WithReplaceNameFieldArray(`["NAME"]`),
-		tests.WithReplaceNameColFilter("NAME"),
+		tests.WithSelect1Want(`[{"age":21,"id":1,"name":"Alex"}]`),
+		tests.WithSelectAllWant(`[{"age":21,"id":1,"name":"Alex"},{"age":100,"id":2,"name":"Alice"}]`),
+		tests.WithReplaceNameFieldArray(`["name"]`),
+		tests.WithReplaceNameColFilter("name"),
 	)
 	tests.RunToolInvokeWithTemplateParameters(t, tableNameTemplateParam, templateParamTestConfig)
 }
 
 func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createStatements []string, insertStatement, tableName string, params []any) func(*testing.T) {
-	t.Helper()
 	err := db.PingContext(ctx)
 	if err != nil {
 		t.Fatalf("unable to connect to test database: %s", err)
@@ -186,7 +184,6 @@ func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createSta
 	}
 
 	return func(t *testing.T) {
-		t.Helper()
 		isNotFoundError := func(err error) bool {
 			if err == nil {
 				return false
@@ -219,8 +216,8 @@ func getFirebirdParamToolInfo(tableName string) ([]string, string, string, strin
 			ACTIVE BEFORE INSERT POSITION 0
 			AS
 			BEGIN
-				IF (NEW.ID IS NULL) THEN
-					NEW.ID = GEN_ID(GEN_%s_ID, 1);
+				IF (NEW.id IS NULL) THEN
+					NEW.id = GEN_ID(GEN_%s_ID, 1);
 			END;
 		`, tableName, tableName, tableName),
 	}
@@ -244,40 +241,105 @@ func getFirebirdAuthToolInfo(tableName string) ([]string, string, string, []any)
 			ACTIVE BEFORE INSERT POSITION 0
 			AS
 			BEGIN
-				IF (NEW.ID IS NULL) THEN
-					NEW.ID = GEN_ID(GEN_%s_ID, 1);
+				IF (NEW.id IS NULL) THEN
+					NEW.id = GEN_ID(GEN_%s_ID, 1);
 			END;
 		`, tableName, tableName, tableName),
 	}
 
-	insertStatement := fmt.Sprintf("INSERT INTO %s (NAME, EMAIL) VALUES (?, ?)", tableName)
-	toolStatement := fmt.Sprintf("SELECT NAME FROM %s WHERE EMAIL = ?;", tableName)
+	insertStatement := fmt.Sprintf("INSERT INTO %s (name, email) VALUES (?, ?)", tableName)
+	toolStatement := fmt.Sprintf("SELECT name FROM %s WHERE email = ?;", tableName)
 	params := []any{"Alice", tests.ServiceAccountEmail, "Jane", "janedoe@gmail.com"}
 	return createStatements, insertStatement, toolStatement, params
 }
 
 func getFirebirdWants() (string, string, string) {
-	select1Want := `[{"CONSTANT":1}]`
+	select1Want := `[{"constant":1}]`
 	failInvocationWant := `{"jsonrpc":"2.0","id":"invoke-fail-tool","result":{"content":[{"type":"text","text":"unable to execute query [SELEC 1;] with params []: Dynamic SQL Error\nSQL error code = -104\nToken unknown - line 1, column 1\nSELEC\n"}],"isError":true}}`
-	createTableStatement := `"CREATE TABLE T (ID INTEGER PRIMARY KEY, NAME VARCHAR(50))"`
+	createTableStatement := `"CREATE TABLE t (id INTEGER PRIMARY KEY, name VARCHAR(50))"`
 	return select1Want, failInvocationWant, createTableStatement
 }
 
 func getFirebirdTemplateParamToolInfo(tableName string) ([]string, string, []any) {
 	createStatements := []string{
-		fmt.Sprintf("CREATE TABLE %s (ID INTEGER NOT NULL PRIMARY KEY, NAME VARCHAR(255), AGE INTEGER);", tableName),
+		fmt.Sprintf("CREATE TABLE %s (id INTEGER NOT NULL PRIMARY KEY, name VARCHAR(255), age INTEGER);", tableName),
 		fmt.Sprintf("CREATE GENERATOR GEN_%s_ID;", tableName),
 		fmt.Sprintf(`
 			CREATE TRIGGER BI_%s_ID FOR %s
 			ACTIVE BEFORE INSERT POSITION 0
 			AS
 			BEGIN
-				IF (NEW.ID IS NULL) THEN
-					NEW.ID = GEN_ID(GEN_%s_ID, 1);
+				IF (NEW.id IS NULL) THEN
+					NEW.id = GEN_ID(GEN_%s_ID, 1);
 			END;
 		`, tableName, tableName, tableName),
 	}
-	insertStatement := fmt.Sprintf("INSERT INTO %s (ID, NAME, AGE) VALUES (?, ?, ?)", tableName)
+	insertStatement := fmt.Sprintf("INSERT INTO %s (id, name, age) VALUES (?, ?, ?)", tableName)
 	params := []any{1, "Alex", 21, 2, "Alice", 100}
 	return createStatements, insertStatement, params
+}
+
+func getFirebirdToolsConfig(sourceConfig map[string]any, toolKind, paramToolStatement, idParamToolStmt, nameParamToolStmt, arrayToolStatement, authToolStatement string) map[string]any {
+	toolsFile := tests.GetToolsConfig(sourceConfig, toolKind, paramToolStatement, idParamToolStmt, nameParamToolStmt, arrayToolStatement, authToolStatement)
+
+	toolsMap, ok := toolsFile["tools"].(map[string]any)
+	if !ok {
+		return toolsFile
+	}
+
+	if simpleTool, ok := toolsMap["my-simple-tool"].(map[string]any); ok {
+		simpleTool["statement"] = "SELECT 1 AS constant FROM RDB$DATABASE;"
+		toolsMap["my-simple-tool"] = simpleTool
+	}
+	if authRequiredTool, ok := toolsMap["my-auth-required-tool"].(map[string]any); ok {
+		authRequiredTool["statement"] = "SELECT 1 AS constant FROM RDB$DATABASE;"
+		toolsMap["my-auth-required-tool"] = authRequiredTool
+	}
+
+	if arrayTool, ok := toolsMap["my-array-tool"].(map[string]any); ok {
+		arrayTool["parameters"] = []any{
+			map[string]any{
+				"name":        "idArray",
+				"type":        "array",
+				"description": "ID array",
+				"items": map[string]any{
+					"name":        "id",
+					"type":        "integer",
+					"description": "ID",
+				},
+			},
+		}
+		toolsMap["my-array-tool"] = arrayTool
+	}
+
+	toolsFile["tools"] = toolsMap
+	return toolsFile
+}
+
+func addFirebirdExecuteSqlConfig(t *testing.T, config map[string]any) map[string]any {
+	tools, ok := config["tools"].(map[string]any)
+	if !ok {
+		t.Fatalf("unable to get tools from config")
+	}
+	tools["my-exec-sql-tool"] = map[string]any{
+		"kind":        "firebird-execute-sql",
+		"source":      "my-instance",
+		"description": "Tool to execute sql",
+	}
+	tools["my-auth-exec-sql-tool"] = map[string]any{
+		"kind":        "firebird-execute-sql",
+		"source":      "my-instance",
+		"description": "Tool to execute sql",
+		"authRequired": []string{
+			"my-google-auth",
+		},
+	}
+	config["tools"] = tools
+	return config
+}
+
+func getFirebirdTmplToolStatement() (string, string) {
+	tmplSelectCombined := "SELECT * FROM {{.tableName}} WHERE id = ?"
+	tmplSelectFilterCombined := "SELECT * FROM {{.tableName}} WHERE {{.columnFilter}} = ?"
+	return tmplSelectCombined, tmplSelectFilterCombined
 }

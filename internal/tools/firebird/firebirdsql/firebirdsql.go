@@ -130,24 +130,27 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 		return nil, fmt.Errorf("unable to extract template params: %w", err)
 	}
 
-	finalSQL := statement
-	var finalParams []any
-
-	finalParams, err := tools.GetParams(t.Parameters, paramsMap)
+	newParams, err := tools.GetParams(t.Parameters, paramsMap)
 	if err != nil {
-		return nil, fmt.Errorf("unable to extract standard params %w", err)
+		return nil, fmt.Errorf("unable to extract standard params: %w", err)
 	}
 
-		var errPrep error
-		finalSQL, finalParams, errPrep = prepareQueryForArrays(statement, t.Parameters, regularParamValues)
-		if errPrep != nil {
-			return nil, fmt.Errorf("failed to prepare query for array parameters: %w", errPrep)
+	namedArgs := make([]any, 0, len(newParams))
+	// To support both named args (e.g :id) and positional args (e.g ?), check
+	// if arg name is contained in the statement.
+	for _, p := range t.Parameters {
+		name := p.GetName()
+		value := paramsMap[name]
+		if strings.Contains(statement, ":"+name) {
+			namedArgs = append(namedArgs, sql.Named(name, value))
+		} else {
+			namedArgs = append(namedArgs, value)
 		}
 	}
 
-	rows, err := t.Db.QueryContext(ctx, finalSQL, finalParams...)
+	rows, err := t.Db.QueryContext(ctx, statement, namedArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("unable to execute query [%s] with params %v: %w", finalSQL, finalParams, err)
+		return nil, fmt.Errorf("unable to execute query: %w", err)
 	}
 	defer rows.Close()
 
@@ -156,13 +159,14 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 		return nil, fmt.Errorf("unable to get columns: %w", err)
 	}
 
+	values := make([]any, len(cols))
+	scanArgs := make([]any, len(values))
+	for i := range values {
+		scanArgs[i] = &values[i]
+	}
+
 	var out []any
 	for rows.Next() {
-		values := make([]any, len(cols))
-		scanArgs := make([]any, len(values))
-		for i := range values {
-			scanArgs[i] = &values[i]
-		}
 
 		err = rows.Scan(scanArgs...)
 		if err != nil {
@@ -185,57 +189,6 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 	}
 
 	return out, nil
-}
-
-func prepareQueryForArrays(originalSQL string, paramDefs tools.Parameters, paramValues tools.ParamValues) (string, []any, error) {
-	var finalSQLBuilder strings.Builder
-	var finalParams []any
-
-	paramIndex := 0
-	lastIndex := 0
-
-	for {
-		placeholderPos := strings.Index(originalSQL[lastIndex:], "?")
-		if placeholderPos == -1 {
-			break
-		}
-
-		absolutePos := lastIndex + placeholderPos
-		finalSQLBuilder.WriteString(originalSQL[lastIndex:absolutePos])
-
-		if paramIndex >= len(paramValues) {
-			return "", nil, fmt.Errorf("more '?' placeholders in SQL than parameters provided")
-		}
-
-		paramDef := paramDefs[paramIndex]
-		paramValue := paramValues[paramIndex].Value
-		paramIndex++
-
-		if paramDef.GetType() == "array" {
-			slice, ok := paramValue.([]any)
-			if !ok {
-				return "", nil, fmt.Errorf("parameter %q is defined as array, but received type %T", paramDef.GetName(), paramValue)
-			}
-
-			if len(slice) == 0 {
-				return "", nil, fmt.Errorf("array parameter %q cannot be empty for an IN clause", paramDef.GetName())
-			}
-
-			placeholders := strings.Repeat("?,", len(slice)-1) + "?"
-			finalSQLBuilder.WriteString(placeholders)
-			finalParams = append(finalParams, slice...)
-
-		} else {
-			finalSQLBuilder.WriteString("?")
-			finalParams = append(finalParams, paramValue)
-		}
-
-		lastIndex = absolutePos + 1
-	}
-
-	finalSQLBuilder.WriteString(originalSQL[lastIndex:])
-
-	return finalSQLBuilder.String(), finalParams, nil
 }
 
 func (t *Tool) ParseParams(data map[string]any, claims map[string]map[string]any) (tools.ParamValues, error) {
