@@ -237,7 +237,7 @@ func getFirebirdParamToolInfo(tableName string) ([]string, string, string, strin
 
 func getFirebirdAuthToolInfo(tableName string) ([]string, string, string, []any) {
 	createStatements := []string{
-		fmt.Sprintf("CREATE TABLE %s (ID INTEGER NOT NULL PRIMARY KEY, NAME VARCHAR(255), EMAIL VARCHAR(255));", tableName),
+		fmt.Sprintf("CREATE TABLE %s (id INTEGER NOT NULL PRIMARY KEY, name VARCHAR(255), email VARCHAR(255));", tableName),
 		fmt.Sprintf("CREATE GENERATOR GEN_%s_ID;", tableName),
 		fmt.Sprintf(`
 			CREATE TRIGGER BI_%s_ID FOR %s
