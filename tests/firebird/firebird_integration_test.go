@@ -137,6 +137,9 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 		tests.WithReplaceNameFieldArray(`["name"]`),
 		tests.WithReplaceNameColFilter("name"),
 		tests.WithDdlWant(ddlWant),
+		tests.WithCreateColArray(`["id INTEGER","name VARCHAR(255)","age INTEGER"]`),
+		tests.WithInsert1Want(ddlWant),
+		tests.WithSelectEmptyWant(ddlWant),
 	)
 	tests.RunToolInvokeWithTemplateParameters(t, tableNameTemplateParam, templateParamTestConfig)
 }
@@ -330,7 +333,7 @@ func addFirebirdTemplateParamConfig(t *testing.T, config map[string]any, toolKin
 		"kind":        toolKind,
 		"source":      "my-instance",
 		"description": "Select table tool with template parameters",
-		"statement":   "SELECT id AS \"id\", name AS \"name\" FROM {{.tableName}}",
+		"statement":   "SELECT id AS \"id\", name AS \"name\", age AS \"age\" FROM {{.tableName}}",
 		"templateParameters": []tools.Parameter{
 			tools.NewStringParameter("tableName", "some description"),
 		},
@@ -340,6 +343,9 @@ func addFirebirdTemplateParamConfig(t *testing.T, config map[string]any, toolKin
 		"source":      "my-instance",
 		"description": "Select table tool with combined template parameters",
 		"statement":   tmplSelectCombined,
+		"parameters": []tools.Parameter{
+			tools.NewIntParameter("id", "the id of the user"),
+		},
 		"templateParameters": []tools.Parameter{
 			tools.NewStringParameter("tableName", "some description"),
 		},
@@ -348,10 +354,9 @@ func addFirebirdTemplateParamConfig(t *testing.T, config map[string]any, toolKin
 		"kind":        toolKind,
 		"source":      "my-instance",
 		"description": "Select specific fields tool with template parameters",
-		"statement":   "SELECT {{array .fields}} FROM {{.tableName}}",
+		"statement":   "SELECT name AS \"name\" FROM {{.tableName}}",
 		"templateParameters": []tools.Parameter{
 			tools.NewStringParameter("tableName", "some description"),
-			tools.NewArrayParameter("fields", "The columns to select", tools.NewStringParameter("column", "A column name to select")),
 		},
 	}
 	toolsMap["select-filter-templateParams-combined-tool"] = map[string]any{
@@ -359,6 +364,9 @@ func addFirebirdTemplateParamConfig(t *testing.T, config map[string]any, toolKin
 		"source":      "my-instance",
 		"description": "Select table tool with filter template parameters",
 		"statement":   tmplSelectFilterCombined,
+		"parameters": []tools.Parameter{
+			tools.NewStringParameter("name", "the name to filter by"),
+		},
 		"templateParameters": []tools.Parameter{
 			tools.NewStringParameter("tableName", "some description"),
 			tools.NewStringParameter("columnFilter", "some description"),
@@ -402,7 +410,7 @@ func addFirebirdExecuteSqlConfig(t *testing.T, config map[string]any) map[string
 
 
 func getFirebirdTmplToolStatement() (string, string) {
-	tmplSelectCombined := "SELECT * FROM {{.tableName}} WHERE id = ?"
-	tmplSelectFilterCombined := "SELECT * FROM {{.tableName}} WHERE {{.columnFilter}} = ?"
+	tmplSelectCombined := "SELECT id AS \"id\", name AS \"name\", age AS \"age\" FROM {{.tableName}} WHERE id = ?"
+	tmplSelectFilterCombined := "SELECT id AS \"id\", name AS \"name\", age AS \"age\" FROM {{.tableName}} WHERE {{.columnFilter}} = ?"
 	return tmplSelectCombined, tmplSelectFilterCombined
 }
