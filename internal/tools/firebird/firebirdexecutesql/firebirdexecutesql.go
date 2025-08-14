@@ -135,55 +135,41 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 	defer rows.Close()
 
 	cols, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve column information: %w", err)
-	}
-
-	if len(cols) == 0 {
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("query execution failed: %w", err)
-		}
-		return "Query executed successfully and returned no content.", nil
-	}
-
-	values := make([]any, len(cols))
-	scanArgs := make([]any, len(values))
-	for i := range values {
-		scanArgs[i] = &values[i]
-	}
 
 	var out []any
-	for rows.Next() {
-		err = rows.Scan(scanArgs...)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse row: %w", err)
+	if err == nil && len(cols) > 0 {
+		values := make([]any, len(cols))
+		scanArgs := make([]any, len(values))
+		for i := range values {
+			scanArgs[i] = &values[i]
 		}
 
-		vMap := make(map[string]any)
-		for i, colName := range cols {
-			if b, ok := values[i].([]byte); ok {
-				vMap[colName] = string(b)
-			} else {
-				vMap[colName] = values[i]
+		for rows.Next() {
+			err = rows.Scan(scanArgs...)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse row: %w", err)
 			}
+
+			vMap := make(map[string]any)
+			for i, colName := range cols {
+				if b, ok := values[i].([]byte); ok {
+					vMap[colName] = string(b)
+				} else {
+					vMap[colName] = values[i]
+				}
+			}
+			out = append(out, vMap)
 		}
-		out = append(out, vMap)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	// If the query returned any rows, return them directly.
-	if len(out) > 0 {
-		return out, nil
-	}
-
-	// This is the fallback for a successful query that doesn't return content.
-	// In most cases, this will be for DML/DDL statements like INSERT, UPDATE, CREATE, etc.
+	// In most cases, DML/DDL statements like INSERT, UPDATE, CREATE, etc. might return no rows
 	// However, it is also possible that this was a query that was expected to return rows
 	// but returned none, a case that we cannot distinguish here.
-	return "Query executed successfully and returned no content.", nil
+	return out, nil
 }
 
 func (t *Tool) ParseParams(data map[string]any, claims map[string]map[string]any) (tools.ParamValues, error) {

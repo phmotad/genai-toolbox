@@ -121,25 +121,18 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 
 	tests.RunToolGetTest(t)
 
-	select1Want, failInvocationWant, _ := getFirebirdWants()
+	select1Want, failInvocationWant, createTableStatement := getFirebirdWants()
 	invokeParamWant := `[{"id":1,"name":"Alice"},{"id":3,"name":"Sid"}]`
 	invokeIdNullWant := `[{"id":4,"name":null}]`
 	nullWant := `[{"id":4,"name":null}]`
 	mcpInvokeParamWant := `{"jsonrpc":"2.0","id":"my-tool","result":{"content":[{"type":"text","text":"{\"id\":1,\"name\":\"Alice\"}"},{"type":"text","text":"{\"id\":3,\"name\":\"Sid\"}"}]}}`
 
-	ddlWant := `"Query executed successfully and returned no content."`
 	tests.RunToolInvokeTest(t, select1Want, invokeParamWant, invokeIdNullWant, nullWant, true, false)
+	tests.RunExecuteSqlToolInvokeTest(t, createTableStatement, select1Want)
 	tests.RunMCPToolCallMethod(t, mcpInvokeParamWant, failInvocationWant)
 
 	templateParamTestConfig := tests.NewTemplateParameterTestConfig(
-		tests.WithSelect1Want(`[{"age":21,"id":1,"name":"Alex"}]`),
-		tests.WithSelectAllWant(`[{"age":21,"id":1,"name":"Alex"},{"age":100,"id":2,"name":"Alice"}]`),
-		tests.WithReplaceNameFieldArray(`["name"]`),
-		tests.WithReplaceNameColFilter("name"),
-		tests.WithDdlWant(ddlWant),
 		tests.WithCreateColArray(`["id INTEGER","name VARCHAR(255)","age INTEGER"]`),
-		tests.WithInsert1Want(ddlWant),
-		tests.WithSelectEmptyWant(ddlWant),
 	)
 	tests.RunToolInvokeWithTemplateParameters(t, tableNameTemplateParam, templateParamTestConfig)
 }
@@ -193,7 +186,7 @@ func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createSta
 
 		_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TRIGGER BI_%s_ID;", tableName))
 		if err != nil && !isNotFoundError(err) {
-			t.Logf("Could not drop trigger (this might be ok): %s", err)
+			t.Logf("Could not drop trigger: %s", err)
 		}
 		_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", tableName))
 		if err != nil && !isNotFoundError(err) {
@@ -201,7 +194,7 @@ func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createSta
 		}
 		_, err = db.ExecContext(ctx, fmt.Sprintf("DROP GENERATOR GEN_%s_ID;", tableName))
 		if err != nil && !isNotFoundError(err) {
-			t.Logf("Could not drop generator (this might be ok): %s", err)
+			t.Logf("Could not drop generator: %s", err)
 		}
 	}
 }
