@@ -207,12 +207,12 @@ func convertToFirebirdSQL(sql string) string {
 	// Trim whitespace and convert to uppercase for comparison
 	trimmed := strings.TrimSpace(sql)
 	upper := strings.ToUpper(trimmed)
-	
+
 	// Handle SELECT without FROM clause - add RDB$DATABASE
 	if upper == "SELECT 1" {
 		return "SELECT 1 AS \"constant\" FROM RDB$DATABASE"
 	}
-	
+
 	// Add more conversions as needed
 	return sql
 }

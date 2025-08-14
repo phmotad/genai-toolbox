@@ -261,7 +261,6 @@ func getFirebirdWants() (string, string, string) {
 	return select1Want, failInvocationWant, createTableStatement
 }
 
-
 func getFirebirdToolsConfig(sourceConfig map[string]any, toolKind, paramToolStatement, idParamToolStmt, nameParamToolStmt, arrayToolStatement, authToolStatement string) map[string]any {
 	toolsFile := tests.GetToolsConfig(sourceConfig, toolKind, paramToolStatement, idParamToolStmt, nameParamToolStmt, arrayToolStatement, authToolStatement)
 
@@ -407,7 +406,6 @@ func addFirebirdExecuteSqlConfig(t *testing.T, config map[string]any) map[string
 	config["tools"] = tools
 	return config
 }
-
 
 func getFirebirdTmplToolStatement() (string, string) {
 	tmplSelectCombined := "SELECT id AS \"id\", name AS \"name\", age AS \"age\" FROM {{.tableName}} WHERE id = ?"
