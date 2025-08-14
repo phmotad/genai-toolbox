@@ -99,10 +99,6 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	teardownTable2 := setupFirebirdTable(t, ctx, db, createAuthTableStmts, insertAuthTableStmt, tableNameAuth, authTestParams)
 	defer teardownTable2(t)
 
-	createTemplateStmts, insertTemplateStmt, templateTestParams := getFirebirdTemplateParamToolInfo(tableNameTemplateParam)
-	teardownTemplateTable := setupFirebirdTable(t, ctx, db, createTemplateStmts, insertTemplateStmt, tableNameTemplateParam, templateTestParams)
-	defer teardownTemplateTable(t)
-
 	toolsFile := getFirebirdToolsConfig(sourceConfig, FirebirdToolKind, paramToolStmt, idParamToolStmt, nameParamToolStmt, arrayToolStmt, authToolStmt)
 	toolsFile = addFirebirdExecuteSqlConfig(t, toolsFile)
 	tmplSelectCombined, tmplSelectFilterCombined := getFirebirdTmplToolStatement()
@@ -135,8 +131,6 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	tests.RunMCPToolCallMethod(t, mcpInvokeParamWant, failInvocationWant)
 
 	templateParamTestConfig := tests.NewTemplateParameterTestConfig(
-		tests.WithIgnoreDdl(),
-		tests.WithIgnoreInsert(),
 		tests.WithSelect1Want(`[{"age":21,"id":1,"name":"Alex"}]`),
 		tests.WithSelectAllWant(`[{"age":21,"id":1,"name":"Alex"},{"age":100,"id":2,"name":"Alice"}]`),
 		tests.WithReplaceNameFieldArray(`["name"]`),
@@ -260,24 +254,6 @@ func getFirebirdWants() (string, string, string) {
 	return select1Want, failInvocationWant, createTableStatement
 }
 
-func getFirebirdTemplateParamToolInfo(tableName string) ([]string, string, []any) {
-	createStatements := []string{
-		fmt.Sprintf("CREATE TABLE %s (id INTEGER NOT NULL PRIMARY KEY, name VARCHAR(255), age INTEGER);", tableName),
-		fmt.Sprintf("CREATE GENERATOR GEN_%s_ID;", tableName),
-		fmt.Sprintf(`
-			CREATE TRIGGER BI_%s_ID FOR %s
-			ACTIVE BEFORE INSERT POSITION 0
-			AS
-			BEGIN
-				IF (NEW.id IS NULL) THEN
-					NEW.id = GEN_ID(GEN_%s_ID, 1);
-			END;
-		`, tableName, tableName, tableName),
-	}
-	insertStatement := fmt.Sprintf("INSERT INTO %s (id, name, age) VALUES (?, ?, ?)", tableName)
-	params := []any{1, "Alex", 21, 2, "Alice", 100}
-	return createStatements, insertStatement, params
-}
 
 func getFirebirdToolsConfig(sourceConfig map[string]any, toolKind, paramToolStatement, idParamToolStmt, nameParamToolStmt, arrayToolStatement, authToolStatement string) map[string]any {
 	toolsFile := tests.GetToolsConfig(sourceConfig, toolKind, paramToolStatement, idParamToolStmt, nameParamToolStmt, arrayToolStatement, authToolStatement)

@@ -92,7 +92,7 @@ func (s *Source) FirebirdDB() *sql.DB {
 }
 
 func initFirebirdConnectionPool(ctx context.Context, tracer trace.Tracer, name, host, port, user, pass, dbname string) (*sql.DB, error) {
-	ctx, span := sources.InitConnectionSpan(ctx, tracer, SourceKind, name)
+	_, span := sources.InitConnectionSpan(ctx, tracer, SourceKind, name)
 	defer span.End()
 
 	// urlExample := "user:password@host:port/path/to/database.fdb"
