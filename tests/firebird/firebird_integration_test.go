@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/googleapis/genai-toolbox/internal/testutils"
+	"github.com/googleapis/genai-toolbox/internal/tools"
 	"github.com/googleapis/genai-toolbox/tests"
 	_ "github.com/nakagami/firebirdsql"
 )
@@ -102,7 +103,7 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 	toolsFile := getFirebirdToolsConfig(sourceConfig, FirebirdToolKind, paramToolStmt, idParamToolStmt, nameParamToolStmt, arrayToolStmt, authToolStmt)
 	toolsFile = addFirebirdExecuteSqlConfig(t, toolsFile)
 	tmplSelectCombined, tmplSelectFilterCombined := getFirebirdTmplToolStatement()
-	toolsFile = tests.AddTemplateParamConfig(t, toolsFile, FirebirdToolKind, tmplSelectCombined, tmplSelectFilterCombined, "")
+	toolsFile = addFirebirdTemplateParamConfig(t, toolsFile, FirebirdToolKind, tmplSelectCombined, tmplSelectFilterCombined)
 
 	cmd, cleanup, err := tests.StartCmd(ctx, toolsFile, args...)
 	if err != nil {
@@ -290,6 +291,88 @@ func getFirebirdToolsConfig(sourceConfig map[string]any, toolKind, paramToolStat
 
 	toolsFile["tools"] = toolsMap
 	return toolsFile
+}
+
+func addFirebirdTemplateParamConfig(t *testing.T, config map[string]any, toolKind, tmplSelectCombined, tmplSelectFilterCombined string) map[string]any {
+	toolsMap, ok := config["tools"].(map[string]any)
+	if !ok {
+		t.Fatalf("unable to get tools from config")
+	}
+
+	// Firebird-specific template parameter tools with compatible syntax
+	toolsMap["create-table-templateParams-tool"] = map[string]any{
+		"kind":        toolKind,
+		"source":      "my-instance",
+		"description": "Create table tool with template parameters",
+		"statement":   "CREATE TABLE {{.tableName}} ({{array .columns}})",
+		"templateParameters": []tools.Parameter{
+			tools.NewStringParameter("tableName", "some description"),
+			tools.NewArrayParameter("columns", "The columns to create", tools.NewStringParameter("column", "A column name that will be created")),
+		},
+	}
+	toolsMap["insert-table-templateParams-tool"] = map[string]any{
+		"kind":        toolKind,
+		"source":      "my-instance",
+		"description": "Insert table tool with template parameters",
+		"statement":   "INSERT INTO {{.tableName}} ({{array .columns}}) VALUES ({{array .values}})",
+		"templateParameters": []tools.Parameter{
+			tools.NewStringParameter("tableName", "some description"),
+			tools.NewArrayParameter("columns", "The columns to create", tools.NewStringParameter("column", "A column name that will be created")),
+			tools.NewArrayParameter("values", "The values to insert", tools.NewStringParameter("value", "A value to insert")),
+		},
+	}
+	toolsMap["select-templateParams-tool"] = map[string]any{
+		"kind":        toolKind,
+		"source":      "my-instance",
+		"description": "Select table tool with template parameters",
+		"statement":   "SELECT {{.column}} FROM {{.tableName}} WHERE id = {{.id}}",
+		"templateParameters": []tools.Parameter{
+			tools.NewStringParameter("tableName", "some description"),
+			tools.NewStringParameter("column", "some description"),
+			tools.NewStringParameter("id", "some description"),
+		},
+	}
+	toolsMap["select-templateParams-combined-tool"] = map[string]any{
+		"kind":        toolKind,
+		"source":      "my-instance",
+		"description": "Select table tool with combined template parameters",
+		"statement":   tmplSelectCombined,
+		"templateParameters": []tools.Parameter{
+			tools.NewStringParameter("tableName", "some description"),
+		},
+	}
+	toolsMap["select-fields-templateParams-tool"] = map[string]any{
+		"kind":        toolKind,
+		"source":      "my-instance",
+		"description": "Select specific fields tool with template parameters",
+		"statement":   "SELECT {{array .columns}} FROM {{.tableName}}",
+		"templateParameters": []tools.Parameter{
+			tools.NewStringParameter("tableName", "some description"),
+			tools.NewArrayParameter("columns", "The columns to select", tools.NewStringParameter("column", "A column name to select")),
+		},
+	}
+	toolsMap["select-filter-templateParams-combined-tool"] = map[string]any{
+		"kind":        toolKind,
+		"source":      "my-instance",
+		"description": "Select table tool with filter template parameters",
+		"statement":   tmplSelectFilterCombined,
+		"templateParameters": []tools.Parameter{
+			tools.NewStringParameter("tableName", "some description"),
+			tools.NewStringParameter("columnFilter", "some description"),
+		},
+	}
+	// Firebird uses simple DROP TABLE syntax without IF EXISTS
+	toolsMap["drop-table-templateParams-tool"] = map[string]any{
+		"kind":        toolKind,
+		"source":      "my-instance",
+		"description": "Drop table tool with template parameters",
+		"statement":   "DROP TABLE {{.tableName}}",
+		"templateParameters": []tools.Parameter{
+			tools.NewStringParameter("tableName", "some description"),
+		},
+	}
+	config["tools"] = toolsMap
+	return config
 }
 
 func addFirebirdExecuteSqlConfig(t *testing.T, config map[string]any) map[string]any {
