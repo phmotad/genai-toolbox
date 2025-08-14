@@ -139,7 +139,7 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("query execution failed: %w", err)
 		}
-		return nil, nil
+		return "Query executed successfully and returned no content.", nil
 	}
 
 	values := make([]any, len(cols))
