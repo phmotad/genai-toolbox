@@ -188,7 +188,16 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	return out, nil
+	// If the query returned any rows, return them directly.
+	if len(out) > 0 {
+		return out, nil
+	}
+
+	// This is the fallback for a successful query that doesn't return content.
+	// In most cases, this will be for DML/DDL statements like INSERT, UPDATE, CREATE, etc.
+	// However, it is also possible that this was a query that was expected to return rows
+	// but returned none, a case that we cannot distinguish here.
+	return "Query executed successfully and returned no content.", nil
 }
 
 func (t *Tool) ParseParams(data map[string]any, claims map[string]map[string]any) (tools.ParamValues, error) {

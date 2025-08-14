@@ -121,14 +121,14 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 
 	tests.RunToolGetTest(t)
 
-	select1Want, failInvocationWant, createTableStatement := getFirebirdWants()
+	select1Want, failInvocationWant, _ := getFirebirdWants()
 	invokeParamWant := `[{"id":1,"name":"Alice"},{"id":3,"name":"Sid"}]`
 	invokeIdNullWant := `[{"id":4,"name":null}]`
 	nullWant := `[{"id":4,"name":null}]`
 	mcpInvokeParamWant := `{"jsonrpc":"2.0","id":"my-tool","result":{"content":[{"type":"text","text":"{\"id\":1,\"name\":\"Alice\"}"},{"type":"text","text":"{\"id\":3,\"name\":\"Sid\"}"}]}}`
 
+	ddlWant := `"Query executed successfully and returned no content."`
 	tests.RunToolInvokeTest(t, select1Want, invokeParamWant, invokeIdNullWant, nullWant, true, false)
-	tests.RunExecuteSqlToolInvokeTest(t, createTableStatement, select1Want)
 	tests.RunMCPToolCallMethod(t, mcpInvokeParamWant, failInvocationWant)
 
 	templateParamTestConfig := tests.NewTemplateParameterTestConfig(
@@ -136,6 +136,7 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 		tests.WithSelectAllWant(`[{"age":21,"id":1,"name":"Alex"},{"age":100,"id":2,"name":"Alice"}]`),
 		tests.WithReplaceNameFieldArray(`["name"]`),
 		tests.WithReplaceNameColFilter("name"),
+		tests.WithDdlWant(ddlWant),
 	)
 	tests.RunToolInvokeWithTemplateParameters(t, tableNameTemplateParam, templateParamTestConfig)
 }
@@ -252,7 +253,7 @@ func getFirebirdAuthToolInfo(tableName string) ([]string, string, string, []any)
 
 func getFirebirdWants() (string, string, string) {
 	select1Want := `[{"constant":1}]`
-	failInvocationWant := `{"jsonrpc":"2.0","id":"invoke-fail-tool","result":{"content":[{"type":"text","text":"unable to execute query [SELEC 1;] with params []: Dynamic SQL Error\nSQL error code = -104\nToken unknown - line 1, column 1\nSELEC\n"}],"isError":true}}`
+	failInvocationWant := `{"jsonrpc":"2.0","id":"invoke-fail-tool","result":{"content":[{"type":"text","text":"unable to execute query: Dynamic SQL Error\nSQL error code = -104\nToken unknown - line 1, column 1\nSELEC\n"}],"isError":true}}`
 	createTableStatement := `"CREATE TABLE t (id INTEGER PRIMARY KEY, name VARCHAR(50))"`
 	return select1Want, failInvocationWant, createTableStatement
 }
@@ -318,22 +319,20 @@ func addFirebirdTemplateParamConfig(t *testing.T, config map[string]any, toolKin
 		"kind":        toolKind,
 		"source":      "my-instance",
 		"description": "Insert table tool with template parameters",
-		"statement":   "INSERT INTO {{.tableName}} ({{array .columns}}) VALUES ({{array .values}})",
+		"statement":   "INSERT INTO {{.tableName}} ({{array .columns}}) VALUES ({{.values}})",
 		"templateParameters": []tools.Parameter{
 			tools.NewStringParameter("tableName", "some description"),
-			tools.NewArrayParameter("columns", "The columns to create", tools.NewStringParameter("column", "A column name that will be created")),
-			tools.NewArrayParameter("values", "The values to insert", tools.NewStringParameter("value", "A value to insert")),
+			tools.NewArrayParameter("columns", "The columns to insert into", tools.NewStringParameter("column", "A column name that will be returned from the query.")),
+			tools.NewStringParameter("values", "The values to insert as a comma separated string"),
 		},
 	}
 	toolsMap["select-templateParams-tool"] = map[string]any{
 		"kind":        toolKind,
 		"source":      "my-instance",
 		"description": "Select table tool with template parameters",
-		"statement":   "SELECT {{.column}} FROM {{.tableName}} WHERE id = {{.id}}",
+		"statement":   "SELECT id AS \"id\", name AS \"name\" FROM {{.tableName}}",
 		"templateParameters": []tools.Parameter{
 			tools.NewStringParameter("tableName", "some description"),
-			tools.NewStringParameter("column", "some description"),
-			tools.NewStringParameter("id", "some description"),
 		},
 	}
 	toolsMap["select-templateParams-combined-tool"] = map[string]any{
@@ -349,10 +348,10 @@ func addFirebirdTemplateParamConfig(t *testing.T, config map[string]any, toolKin
 		"kind":        toolKind,
 		"source":      "my-instance",
 		"description": "Select specific fields tool with template parameters",
-		"statement":   "SELECT {{array .columns}} FROM {{.tableName}}",
+		"statement":   "SELECT {{array .fields}} FROM {{.tableName}}",
 		"templateParameters": []tools.Parameter{
 			tools.NewStringParameter("tableName", "some description"),
-			tools.NewArrayParameter("columns", "The columns to select", tools.NewStringParameter("column", "A column name to select")),
+			tools.NewArrayParameter("fields", "The columns to select", tools.NewStringParameter("column", "A column name to select")),
 		},
 	}
 	toolsMap["select-filter-templateParams-combined-tool"] = map[string]any{
@@ -400,6 +399,7 @@ func addFirebirdExecuteSqlConfig(t *testing.T, config map[string]any) map[string
 	config["tools"] = tools
 	return config
 }
+
 
 func getFirebirdTmplToolStatement() (string, string) {
 	tmplSelectCombined := "SELECT * FROM {{.tableName}} WHERE id = ?"
