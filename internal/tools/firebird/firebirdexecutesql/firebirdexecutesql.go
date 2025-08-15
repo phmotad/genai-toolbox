@@ -79,7 +79,10 @@ func (cfg Config) Initialize(srcs map[string]sources.Source) (tools.Tool, error)
 	sqlParameter := tools.NewStringParameter("sql", "The sql to execute.")
 	parameters := tools.Parameters{sqlParameter}
 
-	_, paramManifest, paramMcpManifest := tools.ProcessParameters(nil, parameters)
+	_, paramManifest, paramMcpManifest, err := tools.ProcessParameters(nil, parameters)
+	if err != nil {
+		return nil, err
+	}
 
 	mcpManifest := tools.McpManifest{
 		Name:        cfg.Name,
