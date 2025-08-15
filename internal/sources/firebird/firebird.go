@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/googleapis/genai-toolbox/internal/sources"
@@ -95,6 +97,13 @@ func initFirebirdConnectionPool(ctx context.Context, tracer trace.Tracer, name, 
 	_, span := sources.InitConnectionSpan(ctx, tracer, SourceKind, name)
 	defer span.End()
 
+	// Trim whitespace from all parameters to avoid connection issues
+	host = strings.TrimSpace(host)
+	port = strings.TrimSpace(port)
+	user = strings.TrimSpace(user)
+	pass = strings.TrimSpace(pass)
+	dbname = strings.TrimSpace(dbname)
+
 	// urlExample := "user:password@host:port/path/to/database.fdb"
 	dsn := fmt.Sprintf("%s:%s@%s:%s/%s", user, pass, host, port, dbname)
 
@@ -102,6 +111,12 @@ func initFirebirdConnectionPool(ctx context.Context, tracer trace.Tracer, name, 
 	if err != nil {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
+
+	// Configure connection pool to prevent deadlocks
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(1 * time.Minute)
 
 	return db, nil
 }

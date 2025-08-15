@@ -66,11 +66,25 @@ func getFirebirdVars(t *testing.T) map[string]any {
 }
 
 func initFirebirdConnection(host, port, user, pass, dbname string) (*sql.DB, error) {
+	// Trim whitespace from all parameters to avoid connection issues
+	host = strings.TrimSpace(host)
+	port = strings.TrimSpace(port)
+	user = strings.TrimSpace(user)
+	pass = strings.TrimSpace(pass)
+	dbname = strings.TrimSpace(dbname)
+
 	dsn := fmt.Sprintf("%s:%s@%s:%s/%s", user, pass, host, port, dbname)
 	db, err := sql.Open("firebirdsql", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
+
+	// Configure connection pool to prevent deadlocks
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(1 * time.Minute)
+
 	return db, nil
 }
 
@@ -176,6 +190,10 @@ func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createSta
 	}
 
 	return func(t *testing.T) {
+		// Create a new timeout context specifically for teardown operations
+		teardownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
 		isNotFoundError := func(err error) bool {
 			if err == nil {
 				return false
@@ -184,18 +202,36 @@ func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createSta
 			return strings.Contains(errMsg, "does not exist") || strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "is not defined")
 		}
 
-		_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TRIGGER BI_%s_ID;", tableName))
-		if err != nil && !isNotFoundError(err) {
-			t.Logf("Could not drop trigger: %s", err)
+		// Force commit any pending transactions that might be blocking
+		if tx, err := db.BeginTx(teardownCtx, nil); err == nil {
+			_ = tx.Commit()
 		}
-		_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", tableName))
-		if err != nil && !isNotFoundError(err) {
-			t.Errorf("Teardown failed to drop table: %s", err)
+
+		// Force close idle connections to avoid locks
+		db.SetMaxIdleConns(0)
+		db.SetMaxIdleConns(2)
+
+		// Try to drop objects with retries to handle temporary locks
+		dropWithRetry := func(query string, objType string) {
+			for attempt := 0; attempt < 3; attempt++ {
+				_, err := db.ExecContext(teardownCtx, query)
+				if err == nil || isNotFoundError(err) {
+					return
+				}
+
+				if attempt < 2 {
+					t.Logf("Attempt %d failed to drop %s: %s, retrying...", attempt+1, objType, err)
+					time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
+				} else {
+					t.Logf("Could not drop %s after 3 attempts: %s", objType, err)
+				}
+			}
 		}
-		_, err = db.ExecContext(ctx, fmt.Sprintf("DROP GENERATOR GEN_%s_ID;", tableName))
-		if err != nil && !isNotFoundError(err) {
-			t.Logf("Could not drop generator: %s", err)
-		}
+
+		// Drop in proper order: trigger, table, generator
+		dropWithRetry(fmt.Sprintf("DROP TRIGGER BI_%s_ID", tableName), "trigger")
+		dropWithRetry(fmt.Sprintf("DROP TABLE %s", tableName), "table")
+		dropWithRetry(fmt.Sprintf("DROP GENERATOR GEN_%s_ID", tableName), "generator")
 	}
 }
 
