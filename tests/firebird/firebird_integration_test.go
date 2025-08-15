@@ -190,48 +190,81 @@ func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createSta
 	}
 
 	return func(t *testing.T) {
-		// Create a new timeout context specifically for teardown operations
-		teardownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
+		// Close the main connection to free up resources
+		db.Close()
 
+		// Helper function to check if error indicates object doesn't exist
 		isNotFoundError := func(err error) bool {
 			if err == nil {
 				return false
 			}
 			errMsg := strings.ToLower(err.Error())
-			return strings.Contains(errMsg, "does not exist") || strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "is not defined")
+			return strings.Contains(errMsg, "does not exist") ||
+				strings.Contains(errMsg, "not found") ||
+				strings.Contains(errMsg, "is not defined") ||
+				strings.Contains(errMsg, "unknown") ||
+				strings.Contains(errMsg, "invalid")
 		}
 
-		// Force commit any pending transactions that might be blocking
-		if tx, err := db.BeginTx(teardownCtx, nil); err == nil {
-			_ = tx.Commit()
-		}
+		// Create dedicated cleanup connection with minimal configuration
+		createCleanupConnection := func() (*sql.DB, error) {
+			dsn := fmt.Sprintf("%s:%s@%s:%s/%s",
+				strings.TrimSpace(FirebirdUser),
+				strings.TrimSpace(FirebirdPass),
+				strings.TrimSpace(FirebirdHost),
+				strings.TrimSpace(FirebirdPort),
+				strings.TrimSpace(FirebirdDatabase))
 
-		// Force close idle connections to avoid locks
-		db.SetMaxIdleConns(0)
-		db.SetMaxIdleConns(2)
-
-		// Try to drop objects with retries to handle temporary locks
-		dropWithRetry := func(query string, objType string) {
-			for attempt := 0; attempt < 3; attempt++ {
-				_, err := db.ExecContext(teardownCtx, query)
-				if err == nil || isNotFoundError(err) {
-					return
-				}
-
-				if attempt < 2 {
-					t.Logf("Attempt %d failed to drop %s: %s, retrying...", attempt+1, objType, err)
-					time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
-				} else {
-					t.Logf("Could not drop %s after 3 attempts: %s", objType, err)
-				}
+			cleanupDb, err := sql.Open("firebirdsql", dsn)
+			if err != nil {
+				return nil, err
 			}
+
+			// Ultra minimal connection pool for cleanup only
+			cleanupDb.SetMaxOpenConns(1)
+			cleanupDb.SetMaxIdleConns(0)
+			cleanupDb.SetConnMaxLifetime(5 * time.Second)
+			cleanupDb.SetConnMaxIdleTime(1 * time.Second)
+
+			return cleanupDb, nil
 		}
 
-		// Drop in proper order: trigger, table, generator
-		dropWithRetry(fmt.Sprintf("DROP TRIGGER BI_%s_ID", tableName), "trigger")
-		dropWithRetry(fmt.Sprintf("DROP TABLE %s", tableName), "table")
-		dropWithRetry(fmt.Sprintf("DROP GENERATOR GEN_%s_ID", tableName), "generator")
+		// Drop each object with its own dedicated connection and aggressive timeout
+		dropObjects := []struct {
+			objType string
+			query   string
+		}{
+			{"trigger", fmt.Sprintf("DROP TRIGGER BI_%s_ID", tableName)},
+			{"table", fmt.Sprintf("DROP TABLE %s", tableName)},
+			{"generator", fmt.Sprintf("DROP GENERATOR GEN_%s_ID", tableName)},
+		}
+
+		for _, obj := range dropObjects {
+			cleanupDb, err := createCleanupConnection()
+			if err != nil {
+				t.Logf("Failed to create cleanup connection for %s: %s", obj.objType, err)
+				continue
+			}
+
+			// Use aggressive short timeout for each operation
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			_, dropErr := cleanupDb.ExecContext(ctx, obj.query)
+			cancel()
+			cleanupDb.Close()
+
+			if dropErr == nil {
+				t.Logf("Successfully dropped %s", obj.objType)
+			} else if isNotFoundError(dropErr) {
+				t.Logf("%s does not exist, skipping", obj.objType)
+			} else if ctx.Err() == context.DeadlineExceeded {
+				t.Logf("Timeout dropping %s (3s limit exceeded) - continuing anyway", obj.objType)
+			} else {
+				t.Logf("Failed to drop %s: %s - continuing anyway", obj.objType, dropErr)
+			}
+
+			// Small delay between operations to reduce contention
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 }
 
