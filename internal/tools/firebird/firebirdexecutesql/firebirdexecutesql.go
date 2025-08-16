@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	yaml "github.com/goccy/go-yaml"
 	"github.com/googleapis/genai-toolbox/internal/sources"
@@ -121,9 +120,6 @@ func (t *Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error
 		return nil, fmt.Errorf("unable to get cast %s", paramsMap["sql"])
 	}
 
-	// Convert SQL to Firebird-compatible syntax
-	sql = convertToFirebirdSQL(sql)
-
 	// Log the query executed for debugging.
 	logger, err := util.LoggerFromContext(ctx)
 	if err != nil {
@@ -189,19 +185,4 @@ func (t *Tool) McpManifest() tools.McpManifest {
 
 func (t *Tool) Authorized(verifiedAuthServices []string) bool {
 	return tools.IsAuthorized(t.AuthRequired, verifiedAuthServices)
-}
-
-// convertToFirebirdSQL converts common SQL patterns to Firebird-compatible syntax
-func convertToFirebirdSQL(sql string) string {
-	// Trim whitespace and convert to uppercase for comparison
-	trimmed := strings.TrimSpace(sql)
-	upper := strings.ToUpper(trimmed)
-
-	// Handle SELECT without FROM clause - add RDB$DATABASE
-	if upper == "SELECT 1" {
-		return "SELECT 1 AS \"constant\" FROM RDB$DATABASE"
-	}
-
-	// Add more conversions as needed
-	return sql
 }
