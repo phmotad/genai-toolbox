@@ -97,13 +97,6 @@ func initFirebirdConnectionPool(ctx context.Context, tracer trace.Tracer, name, 
 	_, span := sources.InitConnectionSpan(ctx, tracer, SourceKind, name)
 	defer span.End()
 
-	// Trim whitespace from all parameters to avoid connection issues
-	host = strings.TrimSpace(host)
-	port = strings.TrimSpace(port)
-	user = strings.TrimSpace(user)
-	pass = strings.TrimSpace(pass)
-	dbname = strings.TrimSpace(dbname)
-
 	// urlExample := "user:password@host:port/path/to/database.fdb"
 	dsn := fmt.Sprintf("%s:%s@%s:%s/%s", user, pass, host, port, dbname)
 

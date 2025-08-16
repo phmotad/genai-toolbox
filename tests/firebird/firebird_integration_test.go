@@ -66,13 +66,6 @@ func getFirebirdVars(t *testing.T) map[string]any {
 }
 
 func initFirebirdConnection(host, port, user, pass, dbname string) (*sql.DB, error) {
-	// Trim whitespace from all parameters to avoid connection issues
-	host = strings.TrimSpace(host)
-	port = strings.TrimSpace(port)
-	user = strings.TrimSpace(user)
-	pass = strings.TrimSpace(pass)
-	dbname = strings.TrimSpace(dbname)
-
 	dsn := fmt.Sprintf("%s:%s@%s:%s/%s", user, pass, host, port, dbname)
 	db, err := sql.Open("firebirdsql", dsn)
 	if err != nil {
@@ -208,12 +201,7 @@ func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createSta
 
 		// Create dedicated cleanup connection with minimal configuration
 		createCleanupConnection := func() (*sql.DB, error) {
-			dsn := fmt.Sprintf("%s:%s@%s:%s/%s",
-				strings.TrimSpace(FirebirdUser),
-				strings.TrimSpace(FirebirdPass),
-				strings.TrimSpace(FirebirdHost),
-				strings.TrimSpace(FirebirdPort),
-				strings.TrimSpace(FirebirdDatabase))
+			dsn := fmt.Sprintf("%s:%s@%s:%s/%s", FirebirdUser, FirebirdPass, FirebirdHost, FirebirdPort, FirebirdDatabase)
 
 			cleanupDb, err := sql.Open("firebirdsql", dsn)
 			if err != nil {
