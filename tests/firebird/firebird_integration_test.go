@@ -126,22 +126,21 @@ func TestFirebirdToolEndpoints(t *testing.T) {
 		t.Fatalf("toolbox didn't start successfully: %s", err)
 	}
 
-	tests.RunToolGetTest(t)
-
+	// Get configs for tests
 	select1Want, failInvocationWant, createTableStatement := getFirebirdWants()
-	invokeParamWant := `[{"id":1,"name":"Alice"},{"id":3,"name":"Sid"}]`
-	invokeIdNullWant := `[{"id":4,"name":null}]`
 	nullWant := `[{"id":4,"name":null}]`
-	mcpInvokeParamWant := `{"jsonrpc":"2.0","id":"my-tool","result":{"content":[{"type":"text","text":"{\"id\":1,\"name\":\"Alice\"}"},{"type":"text","text":"{\"id\":3,\"name\":\"Sid\"}"}]}}`
+	select1Statement := "SELECT 1 AS \"constant\" FROM RDB$DATABASE;"
+	templateParamCreateColArray := `["id INTEGER","name VARCHAR(255)","age INTEGER"]`
 
-	tests.RunToolInvokeTest(t, select1Want, invokeParamWant, invokeIdNullWant, nullWant, true, false)
-	tests.RunExecuteSqlToolInvokeTest(t, createTableStatement, select1Want)
-	tests.RunMCPToolCallMethod(t, mcpInvokeParamWant, failInvocationWant)
-
-	templateParamTestConfig := tests.NewTemplateParameterTestConfig(
-		tests.WithCreateColArray(`["id INTEGER","name VARCHAR(255)","age INTEGER"]`),
-	)
-	tests.RunToolInvokeWithTemplateParameters(t, tableNameTemplateParam, templateParamTestConfig)
+	// Run tests
+	tests.RunToolGetTest(t)
+	tests.RunToolInvokeTest(t, select1Want,
+		tests.WithNullWant(nullWant),
+		tests.DisableArrayTest())
+	tests.RunMCPToolCallMethod(t, failInvocationWant)
+	tests.RunExecuteSqlToolInvokeTest(t, createTableStatement, select1Want, tests.WithSelect1Statement(select1Statement))
+	tests.RunToolInvokeWithTemplateParameters(t, tableNameTemplateParam,
+		tests.WithCreateColArray(templateParamCreateColArray))
 }
 
 func setupFirebirdTable(t *testing.T, ctx context.Context, db *sql.DB, createStatements []string, insertStatement, tableName string, params []any) func(*testing.T) {
